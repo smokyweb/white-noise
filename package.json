@@ -1,0 +1,9 @@
+{
+  "name": "white-noise",
+  "version": "1.0.0",
+  "description": "White Noise app",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  }
+}
