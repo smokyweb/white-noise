@@ -72,6 +72,9 @@
     .melody-btn { border-color: #3a2a3a; color: #c090c0; }
     .melody-btn:hover { border-color: #e879f9; color: #e879f9; background: #2a1a2a; }
     .melody-btn.active { background: linear-gradient(135deg, #2d1a3a, #1a1a3a); border-color: #e879f9; color: #fff; box-shadow: 0 0 20px rgba(232,121,249,0.2); }
+    .lullaby-btn { border-color: #2a2a3a; color: #93c5fd; }
+    .lullaby-btn:hover { border-color: #60a5fa; color: #bfdbfe; background: #1a1a2e; }
+    .lullaby-btn.active { background: linear-gradient(135deg, #1a1a3a, #1a2a3a); border-color: #60a5fa; color: #fff; box-shadow: 0 0 20px rgba(96,165,250,0.2); }
 
     .control-group { margin-bottom: 24px; }
     .control-label {
@@ -222,6 +225,14 @@
       <button class="sound-btn melody-btn" data-sound="melody" onclick="selectSound(this)">
         <span class="icon">🎵</span><span class="label">Melody</span>
       </button>
+      <button class="sound-btn lullaby-btn" data-sound="lullaby" onclick="selectSound(this)">
+        <span class="icon">🌙</span><span class="label">Lullaby</span>
+      </button>
+    </div>
+
+    <!-- Hidden YouTube player -->
+    <div id="yt-container" style="position:absolute;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none;">
+      <div id="yt-player"></div>
     </div>
 
     <hr class="divider" />
@@ -274,6 +285,8 @@
   let timerTimeout = null, timerInterval = null, timerEnd = null;
   // Melody sequencer state
   let melodyScheduler = null, melodyNoteIndex = 0, melodyNextTime = 0;
+  // YouTube player state
+  let ytPlayer = null, ytReady = false;
 
   function initAudio() {
     if (ctx) return;
@@ -479,14 +492,58 @@
       startMelodySequencer();
       return;
     }
+    if (currentSound === 'lullaby') {
+      startLullaby();
+      return;
+    }
     currentSource = createNoise(currentSound);
     currentSource.connect(bassFilter);
     currentSource.start(0);
   }
 
+  function startLullaby() {
+    if (ytReady && ytPlayer) {
+      ytPlayer.setVolume(document.getElementById('volume').value);
+      ytPlayer.playVideo();
+    } else {
+      // Load YouTube API if not already loaded
+      if (!window.YT) {
+        const tag = document.createElement('script');
+        tag.src = 'https://www.youtube.com/iframe_api';
+        document.head.appendChild(tag);
+      }
+      // Will be started by onYouTubeIframeAPIReady or after ready
+      window._pendingLullaby = true;
+    }
+  }
+
+  function onYouTubeIframeAPIReady() {
+    ytPlayer = new YT.Player('yt-player', {
+      height: '1', width: '1',
+      videoId: 'gzorktA2S8w',
+      playerVars: { autoplay: 0, controls: 0, loop: 1, playlist: 'gzorktA2S8w' },
+      events: {
+        onReady: (e) => {
+          ytReady = true;
+          e.target.setVolume(document.getElementById('volume').value);
+          if (window._pendingLullaby && isPlaying && currentSound === 'lullaby') {
+            e.target.playVideo();
+            window._pendingLullaby = false;
+          }
+        },
+        onStateChange: (e) => {
+          // Auto-loop if ended
+          if (e.data === YT.PlayerState.ENDED) e.target.playVideo();
+        }
+      }
+    });
+  }
+  window.onYouTubeIframeAPIReady = onYouTubeIframeAPIReady;
+
   function stopSound() {
     if (currentSource) { try { currentSource.stop(); } catch(e){} currentSource = null; }
     if (melodyScheduler) { clearInterval(melodyScheduler); melodyScheduler = null; }
+    if (ytPlayer && ytReady) { try { ytPlayer.pauseVideo(); } catch(e){} }
   }
 
   function togglePlay() {
@@ -520,6 +577,7 @@
   function setVolume(val) {
     document.getElementById('volDisplay').textContent = val + '%';
     if (masterGain) masterGain.gain.value = val / 100;
+    if (ytPlayer && ytReady) { try { ytPlayer.setVolume(parseInt(val)); } catch(e){} }
   }
 
   function setEQ(type, val) {
