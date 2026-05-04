@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>White Noise</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0a0a12;
+      color: #e0e0f0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      margin-bottom: 6px;
+      background: linear-gradient(135deg, #a78bfa, #60a5fa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .subtitle {
+      color: #6b7280;
+      font-size: 0.9rem;
+      margin-bottom: 40px;
+    }
+
+    .card {
+      background: #13131f;
+      border: 1px solid #1e1e30;
+      border-radius: 20px;
+      padding: 32px;
+      width: 100%;
+      max-width: 480px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+
+    /* Sound Grid */
+    .sounds-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      margin-bottom: 32px;
+    }
+
+    .sound-btn {
+      background: #1a1a2e;
+      border: 2px solid #2a2a40;
+      border-radius: 14px;
+      padding: 16px 8px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s;
+      color: #a0a0c0;
+    }
+
+    .sound-btn:hover {
+      border-color: #a78bfa;
+      color: #e0e0f0;
+      background: #1e1e35;
+    }
+
+    .sound-btn.active {
+      background: linear-gradient(135deg, #2d1f63, #1a2d63);
+      border-color: #a78bfa;
+      color: #fff;
+      box-shadow: 0 0 20px rgba(167,139,250,0.2);
+    }
+
+    .sound-btn .icon {
+      font-size: 1.8rem;
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    .sound-btn .label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* Controls */
+    .control-group {
+      margin-bottom: 24px;
+    }
+
+    .control-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.85rem;
+      color: #8080a0;
+      margin-bottom: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .control-label span:last-child {
+      color: #a78bfa;
+      font-size: 0.9rem;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: #2a2a40;
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #a78bfa, #60a5fa);
+      cursor: pointer;
+      box-shadow: 0 0 8px rgba(167,139,250,0.5);
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #a78bfa, #60a5fa);
+      cursor: pointer;
+      border: none;
+    }
+
+    /* Play Button */
+    .play-btn {
+      width: 100%;
+      padding: 16px;
+      border: none;
+      border-radius: 14px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      letter-spacing: 0.5px;
+      transition: all 0.2s;
+      background: linear-gradient(135deg, #a78bfa, #60a5fa);
+      color: #fff;
+      box-shadow: 0 4px 20px rgba(167,139,250,0.3);
+      margin-top: 8px;
+    }
+
+    .play-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 25px rgba(167,139,250,0.4);
+    }
+
+    .play-btn:active { transform: translateY(0); }
+
+    .play-btn.playing {
+      background: linear-gradient(135deg, #ef4444, #f97316);
+      box-shadow: 0 4px 20px rgba(239,68,68,0.3);
+    }
+
+    /* Timer */
+    .timer-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-bottom: 24px;
+    }
+
+    .timer-btn {
+      background: #1a1a2e;
+      border: 2px solid #2a2a40;
+      border-radius: 10px;
+      padding: 10px 4px;
+      cursor: pointer;
+      text-align: center;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #8080a0;
+      transition: all 0.2s;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    .timer-btn:hover { border-color: #a78bfa; color: #e0e0f0; }
+    .timer-btn.active { border-color: #a78bfa; color: #a78bfa; background: #1e1e35; }
+
+    .section-title {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #4a4a6a;
+      margin-bottom: 12px;
+    }
+
+    .divider {
+      border: none;
+      border-top: 1px solid #1e1e30;
+      margin: 24px 0;
+    }
+
+    .status-bar {
+      text-align: center;
+      font-size: 0.8rem;
+      color: #6b7280;
+      margin-top: 16px;
+      min-height: 18px;
+    }
+
+    .status-bar.active { color: #a78bfa; }
+
+    @media (max-width: 400px) {
+      .sounds-grid { grid-template-columns: repeat(2, 1fr); }
+      .card { padding: 20px; }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>White Noise</h1>
+  <p class="subtitle">Focus. Sleep. Relax.</p>
+
+  <div class="card">
+
+    <!-- Sound Selection -->
+    <div class="section-title">Sound</div>
+    <div class="sounds-grid" id="soundGrid">
+      <button class="sound-btn active" data-sound="white" onclick="selectSound(this)">
+        <span class="icon">🌫️</span>
+        <span class="label">White</span>
+      </button>
+      <button class="sound-btn" data-sound="brown" onclick="selectSound(this)">
+        <span class="icon">🌊</span>
+        <span class="label">Brown</span>
+      </button>
+      <button class="sound-btn" data-sound="pink" onclick="selectSound(this)">
+        <span class="icon">🌸</span>
+        <span class="label">Pink</span>
+      </button>
+      <button class="sound-btn" data-sound="rain" onclick="selectSound(this)">
+        <span class="icon">🌧️</span>
+        <span class="label">Rain</span>
+      </button>
+      <button class="sound-btn" data-sound="storm" onclick="selectSound(this)">
+        <span class="icon">⛈️</span>
+        <span class="label">Storm</span>
+      </button>
+      <button class="sound-btn" data-sound="forest" onclick="selectSound(this)">
+        <span class="icon">🌲</span>
+        <span class="label">Forest</span>
+      </button>
+      <button class="sound-btn" data-sound="fire" onclick="selectSound(this)">
+        <span class="icon">🔥</span>
+        <span class="label">Fire</span>
+      </button>
+      <button class="sound-btn" data-sound="waves" onclick="selectSound(this)">
+        <span class="icon">🏖️</span>
+        <span class="label">Waves</span>
+      </button>
+      <button class="sound-btn" data-sound="fan" onclick="selectSound(this)">
+        <span class="icon">💨</span>
+        <span class="label">Fan</span>
+      </button>
+    </div>
+
+    <hr class="divider" />
+
+    <!-- Volume -->
+    <div class="control-group">
+      <div class="control-label">
+        <span>Volume</span>
+        <span id="volDisplay">70%</span>
+      </div>
+      <input type="range" id="volume" min="0" max="100" value="70"
+        oninput="setVolume(this.value)" />
+    </div>
+
+    <!-- Bass -->
+    <div class="control-group">
+      <div class="control-label">
+        <span>Bass</span>
+        <span id="bassDisplay">0 dB</span>
+      </div>
+      <input type="range" id="bass" min="-12" max="12" value="0" step="1"
+        oninput="setEQ('bass', this.value)" />
+    </div>
+
+    <!-- Treble -->
+    <div class="control-group">
+      <div class="control-label">
+        <span>Treble</span>
+        <span id="trebleDisplay">0 dB</span>
+      </div>
+      <input type="range" id="treble" min="-12" max="12" value="0" step="1"
+        oninput="setEQ('treble', this.value)" />
+    </div>
+
+    <hr class="divider" />
+
+    <!-- Timer -->
+    <div class="section-title">Sleep Timer</div>
+    <div class="timer-grid">
+      <button class="timer-btn active" data-mins="0" onclick="setTimer(this)">Off</button>
+      <button class="timer-btn" data-mins="15" onclick="setTimer(this)">15 min</button>
+      <button class="timer-btn" data-mins="30" onclick="setTimer(this)">30 min</button>
+      <button class="timer-btn" data-mins="60" onclick="setTimer(this)">1 hr</button>
+    </div>
+
+    <!-- Play Button -->
+    <button class="play-btn" id="playBtn" onclick="togglePlay()">▶ Play</button>
+
+    <div class="status-bar" id="statusBar">Choose a sound and press Play</div>
+
+  </div>
+
+<script>
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  let ctx = null;
+  let masterGain = null;
+  let bassFilter = null;
+  let trebleFilter = null;
+  let currentSource = null;
+  let isPlaying = false;
+  let currentSound = 'white';
+  let timerMins = 0;
+  let timerTimeout = null;
+  let timerInterval = null;
+  let timerEnd = null;
+
+  // --- Audio Engine ---
+
+  function initAudio() {
+    if (ctx) return;
+    ctx = new AudioContext();
+    masterGain = ctx.createGain();
+    masterGain.gain.value = 0.7;
+
+    bassFilter = ctx.createBiquadFilter();
+    bassFilter.type = 'lowshelf';
+    bassFilter.frequency.value = 200;
+    bassFilter.gain.value = 0;
+
+    trebleFilter = ctx.createBiquadFilter();
+    trebleFilter.type = 'highshelf';
+    trebleFilter.frequency.value = 3000;
+    trebleFilter.gain.value = 0;
+
+    bassFilter.connect(trebleFilter);
+    trebleFilter.connect(masterGain);
+    masterGain.connect(ctx.destination);
+  }
+
+  function createNoise(type) {
+    const bufferSize = ctx.sampleRate * 4; // 4 seconds, looped
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+
+    if (type === 'white' || type === 'fan') {
+      for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+    } else if (type === 'pink') {
+      let b0=0,b1=0,b2=0,b3=0,b4=0,b5=0,b6=0;
+      for (let i = 0; i < bufferSize; i++) {
+        const w = Math.random() * 2 - 1;
+        b0 = 0.99886*b0 + w*0.0555179; b1 = 0.99332*b1 + w*0.0750759;
+        b2 = 0.96900*b2 + w*0.1538520; b3 = 0.86650*b3 + w*0.3104856;
+        b4 = 0.55000*b4 + w*0.5329522; b5 = -0.7616*b5 - w*0.0168980;
+        data[i] = (b0+b1+b2+b3+b4+b5+b6+w*0.5362) * 0.11;
+        b6 = w * 0.115926;
+      }
+    } else if (type === 'brown') {
+      let last = 0;
+      for (let i = 0; i < bufferSize; i++) {
+        const w = Math.random() * 2 - 1;
+        data[i] = (last + (0.02 * w)) / 1.02;
+        last = data[i]; data[i] *= 3.5;
+      }
+    } else if (type === 'rain') {
+      // Filtered white noise with random crackle
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * (Math.random() < 0.1 ? 0.8 : 0.15);
+      }
+    } else if (type === 'storm') {
+      let rumble = 0;
+      for (let i = 0; i < bufferSize; i++) {
+        rumble = 0.98 * rumble + 0.02 * (Math.random() * 2 - 1);
+        data[i] = rumble * 1.5 + (Math.random() * 2 - 1) * 0.1;
+      }
+    } else if (type === 'forest') {
+      // Gentle layered noise
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * 0.12 + Math.sin(i * 0.001) * 0.05;
+      }
+    } else if (type === 'fire') {
+      let crackle = 0;
+      for (let i = 0; i < bufferSize; i++) {
+        crackle = 0.95 * crackle + 0.05 * (Math.random() * 2 - 1);
+        data[i] = crackle * 0.8 + (Math.random() < 0.005 ? (Math.random()*2-1)*0.9 : 0);
+      }
+    } else if (type === 'waves') {
+      for (let i = 0; i < bufferSize; i++) {
+        const wave = Math.sin(i * 0.0003) * 0.5 + 0.5;
+        data[i] = (Math.random() * 2 - 1) * wave * 0.7;
+      }
+    }
+
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.loop = true;
+    return source;
+  }
+
+  function startSound() {
+    if (currentSource) { try { currentSource.stop(); } catch(e){} }
+    initAudio();
+    if (ctx.state === 'suspended') ctx.resume();
+    currentSource = createNoise(currentSound);
+    currentSource.connect(bassFilter);
+    currentSource.start(0);
+  }
+
+  function stopSound() {
+    if (currentSource) {
+      try { currentSource.stop(); } catch(e) {}
+      currentSource = null;
+    }
+  }
+
+  // --- UI Controls ---
+
+  function togglePlay() {
+    if (!isPlaying) {
+      startSound();
+      isPlaying = true;
+      document.getElementById('playBtn').textContent = '⏹ Stop';
+      document.getElementById('playBtn').classList.add('playing');
+      startTimerIfSet();
+      updateStatus();
+    } else {
+      stopSound();
+      isPlaying = false;
+      clearTimer();
+      document.getElementById('playBtn').textContent = '▶ Play';
+      document.getElementById('playBtn').classList.remove('playing');
+      document.getElementById('statusBar').textContent = 'Choose a sound and press Play';
+      document.getElementById('statusBar').classList.remove('active');
+    }
+  }
+
+  function selectSound(btn) {
+    document.querySelectorAll('.sound-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentSound = btn.dataset.sound;
+    if (isPlaying) startSound(); // Switch sound live
+    updateStatus();
+  }
+
+  function setVolume(val) {
+    document.getElementById('volDisplay').textContent = val + '%';
+    if (masterGain) masterGain.gain.value = val / 100;
+  }
+
+  function setEQ(type, val) {
+    if (type === 'bass') {
+      document.getElementById('bassDisplay').textContent = (val >= 0 ? '+' : '') + val + ' dB';
+      if (bassFilter) bassFilter.gain.value = parseFloat(val);
+    } else {
+      document.getElementById('trebleDisplay').textContent = (val >= 0 ? '+' : '') + val + ' dB';
+      if (trebleFilter) trebleFilter.gain.value = parseFloat(val);
+    }
+  }
+
+  function setTimer(btn) {
+    document.querySelectorAll('.timer-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    timerMins = parseInt(btn.dataset.mins);
+    clearTimer();
+    if (isPlaying) startTimerIfSet();
+    updateStatus();
+  }
+
+  function startTimerIfSet() {
+    if (timerMins <= 0) return;
+    clearTimer();
+    timerEnd = Date.now() + timerMins * 60 * 1000;
+    timerTimeout = setTimeout(() => {
+      togglePlay();
+    }, timerMins * 60 * 1000);
+    timerInterval = setInterval(updateStatus, 1000);
+  }
+
+  function clearTimer() {
+    if (timerTimeout) { clearTimeout(timerTimeout); timerTimeout = null; }
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    timerEnd = null;
+  }
+
+  function updateStatus() {
+    const bar = document.getElementById('statusBar');
+    if (!isPlaying) return;
+    const soundName = document.querySelector('.sound-btn.active .label').textContent;
+    if (timerEnd) {
+      const remaining = Math.max(0, Math.round((timerEnd - Date.now()) / 1000));
+      const m = Math.floor(remaining / 60);
+      const s = remaining % 60;
+      bar.textContent = `▶ Playing ${soundName} noise · Timer: ${m}:${s.toString().padStart(2,'0')}`;
+    } else {
+      bar.textContent = `▶ Playing ${soundName} noise`;
+    }
+    bar.classList.add('active');
+  }
+</script>
+
+</body>
+</html>
