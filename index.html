@@ -272,6 +272,8 @@
   let currentSource = null, isPlaying = false, currentSound = 'white';
   let timerMins = -1; // -1 = continuous
   let timerTimeout = null, timerInterval = null, timerEnd = null;
+  // Melody sequencer state
+  let melodyScheduler = null, melodyNoteIndex = 0, melodyNextTime = 0;
 
   function initAudio() {
     if (ctx) return;
@@ -335,50 +337,6 @@
         const wave=Math.sin(i*0.0003)*0.5+0.5;
         data[i]=(Math.random()*2-1)*wave*0.7;
       }
-    } else if (type === 'melody') {
-      // Gentle lullaby-style melody for mental stress relief
-      // Uses a pentatonic scale in a slow, breathing pattern
-      // Frequencies in C major pentatonic: C4=261.6, E4=329.6, G4=392, A4=440, C5=523.2
-      const sr = ctx.sampleRate;
-      // Define a repeating melodic phrase (note, duration_in_beats, volume)
-      const bpm = 52; // very slow, calming
-      const beat = sr * 60 / bpm;
-      const phrase = [
-        [261.6, 2.0, 0.7], [329.6, 1.5, 0.5], [392.0, 1.5, 0.6],
-        [440.0, 2.0, 0.55],[392.0, 1.0, 0.4], [329.6, 3.0, 0.65],
-        [261.6, 1.5, 0.5], [293.7, 1.5, 0.45],[329.6, 2.0, 0.6],
-        [261.6, 1.0, 0.4], [220.0, 1.5, 0.5], [261.6, 3.5, 0.7],
-        [392.0, 1.5, 0.5], [440.0, 1.5, 0.55],[523.2, 2.0, 0.6],
-        [440.0, 1.5, 0.45],[392.0, 1.5, 0.5], [329.6, 4.0, 0.65],
-      ];
-      const phraseLen = phrase.reduce((s,n) => s + n[1]*beat, 0);
-      // Build sample buffer — loop phrase across full buffer
-      for (let i = 0; i < bufferSize; i++) {
-        const posInPhrase = i % phraseLen;
-        let t = 0, noteFreq = 261.6, noteVol = 0.5, noteDur = beat;
-        for (const [freq, dur, vol] of phrase) {
-          const d = dur * beat;
-          if (posInPhrase < t + d) { noteFreq = freq; noteVol = vol; noteDur = d; break; }
-          t += d;
-        }
-        const posInNote = posInPhrase - t;
-        // Soft attack/release envelope
-        const attackLen = Math.min(noteDur * 0.15, sr * 0.08);
-        const releaseLen = Math.min(noteDur * 0.35, sr * 0.25);
-        let env = 1.0;
-        if (posInNote < attackLen) env = posInNote / attackLen;
-        else if (posInNote > noteDur - releaseLen) env = (noteDur - posInNote) / releaseLen;
-        env = Math.max(0, Math.min(1, env));
-        // Sine wave with soft 2nd harmonic overtone for warmth
-        const sampleT = i / sr;
-        const wave =
-          Math.sin(2 * Math.PI * noteFreq * sampleT) * 0.7 +
-          Math.sin(2 * Math.PI * noteFreq * 2 * sampleT) * 0.15 +
-          Math.sin(2 * Math.PI * noteFreq * 0.5 * sampleT) * 0.15;
-        // Very faint pink noise breath underneath
-        const breath = (Math.random() * 2 - 1) * 0.018;
-        data[i] = wave * env * noteVol * 0.55 + breath;
-      }
     } else if (type === 'relax') {
       // Soft therapy music: layered sine tones (432Hz base, harmonics) + gentle pink noise bed
       const notes = [432, 528, 639, 741, 852]; // Solfeggio-inspired frequencies
@@ -409,10 +367,118 @@
     return source;
   }
 
+  // ── Melody sequencer ────────────────────────────────────────────────
+  // A full lullaby in 4 stanzas, C major, 48 BPM
+  // Note format: [midi, beats, vol]  (0 = rest)
+  const BPM = 48;
+  const BEAT = () => 60 / BPM;
+
+  // Helper: midi note → Hz
+  function midiHz(m) { return m === 0 ? 0 : 440 * Math.pow(2, (m - 69) / 12); }
+
+  // 4 stanzas — each is an array of [midi, beats, vol]
+  // C4=60 D4=62 E4=64 F4=65 G4=67 A4=69 B4=71 C5=72 E5=76 G5=79
+  const SONG = [
+    // Stanza 1 — Intro: gentle descending phrase
+    [
+      [72,2,.7],[71,1,.55],[69,1,.6],[67,2,.65],[65,1,.5],[64,1,.55],
+      [62,2,.6],[60,3,.7],  [0,1,0],
+      [64,1.5,.55],[65,1,.5],[67,2,.6],[69,1.5,.55],[67,1,.5],[65,3,.65],
+      [0,1,0],
+      [60,1.5,.6],[62,1,.5],[64,1.5,.55],[65,2,.6],[64,1,.5],[62,1,.5],[60,4,.7],
+      [0,2,0]
+    ],
+    // Stanza 2 — Rising hope: ascending, brighter feel
+    [
+      [60,1.5,.6],[64,1,.5],[67,1.5,.65],[69,2,.6],[72,1,.55],[71,1,.5],
+      [69,3,.65],[0,1,0],
+      [67,1.5,.55],[69,1,.5],[71,2,.6],[72,1.5,.65],[71,1,.55],[69,1,.5],[67,3,.6],
+      [0,1,0],
+      [64,1.5,.55],[65,1,.5],[67,1.5,.6],[69,2,.65],[67,1,.55],[65,1,.5],
+      [64,2,.6],[62,1,.5],[60,4,.7],[0,2,0]
+    ],
+    // Stanza 3 — Comfort: warm mid-range, slower
+    [
+      [67,2,.65],[65,1.5,.55],[64,1.5,.6],[62,2,.55],[60,1,.5],[62,1,.5],
+      [64,4,.65],[0,1,0],
+      [65,1.5,.6],[64,1,.55],[62,1.5,.6],[60,3,.7],[0,1,0],
+      [60,1,.5],[62,1,.5],[64,1.5,.55],[65,2,.6],[67,1.5,.65],[65,1,.55],
+      [64,2,.6],[62,1,.5],[60,5,.7],[0,2,0]
+    ],
+    // Stanza 4 — Closing: soft descent to rest
+    [
+      [72,1.5,.55],[71,1,.5],[69,2,.6],[67,1.5,.55],[65,1,.5],[64,2,.55],
+      [62,2,.5],[60,3,.65],[0,1,0],
+      [64,1.5,.5],[62,1,.45],[60,1.5,.5],[59,2,.45],[60,3,.55],[0,1,0],
+      [60,1,.45],[62,1,.5],[64,2,.55],[62,1.5,.5],[60,2,.55],
+      [59,2,.45],[55,2,.5],[60,6,.55],[0,3,0]
+    ]
+  ];
+
+  // Flatten all stanzas into one sequence that loops
+  const FULL_SONG = SONG.flat();
+
+  function playMelodyNote(freq, duration, vol, startTime) {
+    if (!freq) return; // rest
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const osc2 = ctx.createOscillator(); // soft overtone
+    const gain2 = ctx.createGain();
+
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    osc2.type = 'sine';
+    osc2.frequency.value = freq * 2; // octave overtone
+
+    const attack = Math.min(duration * 0.12, 0.12);
+    const release = Math.min(duration * 0.4, 0.5);
+    const peak = vol * 0.5;
+
+    gain.gain.setValueAtTime(0, startTime);
+    gain.gain.linearRampToValueAtTime(peak, startTime + attack);
+    gain.gain.setValueAtTime(peak, startTime + duration - release);
+    gain.gain.linearRampToValueAtTime(0, startTime + duration);
+
+    gain2.gain.setValueAtTime(0, startTime);
+    gain2.gain.linearRampToValueAtTime(peak * 0.12, startTime + attack);
+    gain2.gain.linearRampToValueAtTime(0, startTime + duration);
+
+    osc.connect(gain);   gain.connect(masterGain);
+    osc2.connect(gain2); gain2.connect(masterGain);
+    osc.start(startTime);  osc.stop(startTime + duration + 0.05);
+    osc2.start(startTime); osc2.stop(startTime + duration + 0.05);
+  }
+
+  function startMelodySequencer() {
+    if (melodyScheduler) clearInterval(melodyScheduler);
+    melodyNoteIndex = 0;
+    melodyNextTime = ctx.currentTime + 0.1;
+    const LOOKAHEAD = 0.3; // seconds ahead to schedule
+    const INTERVAL = 100;  // ms scheduler tick
+
+    melodyScheduler = setInterval(() => {
+      if (!isPlaying) { clearInterval(melodyScheduler); return; }
+      while (melodyNextTime < ctx.currentTime + LOOKAHEAD) {
+        const [midi, beats, vol] = FULL_SONG[melodyNoteIndex % FULL_SONG.length];
+        const dur = beats * BEAT();
+        const freq = midiHz(midi);
+        playMelodyNote(freq, dur, vol, melodyNextTime);
+        melodyNextTime += dur;
+        melodyNoteIndex++;
+      }
+    }, INTERVAL);
+  }
+  // ────────────────────────────────────────────────────────────────────
+
   function startSound() {
     if (currentSource) { try { currentSource.stop(); } catch(e){} }
+    if (melodyScheduler) { clearInterval(melodyScheduler); melodyScheduler = null; }
     initAudio();
     if (ctx.state === 'suspended') ctx.resume();
+    if (currentSound === 'melody') {
+      startMelodySequencer();
+      return;
+    }
     currentSource = createNoise(currentSound);
     currentSource.connect(bassFilter);
     currentSource.start(0);
@@ -420,6 +486,7 @@
 
   function stopSound() {
     if (currentSource) { try { currentSource.stop(); } catch(e){} currentSource = null; }
+    if (melodyScheduler) { clearInterval(melodyScheduler); melodyScheduler = null; }
   }
 
   function togglePlay() {
